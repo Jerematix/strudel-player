@@ -514,8 +514,15 @@ function guessCycles(code) {
 
 el.wav.addEventListener('click', async () => {
   if (!state.ready || !state.track) return;
-  const cycles = parseInt(prompt('render how many cycles (bars)?', guessCycles(state.code)), 10);
+  const input = prompt(
+    "render how many cycles (bars)? (append ' draft' for a ~2x faster 22kHz render)",
+    guessCycles(state.code),
+  );
+  if (input == null) return;
+  const cycles = parseInt(input, 10);
   if (!cycles || cycles <= 0) return;
+  const draft = /draft/i.test(input);
+  const sampleRate = draft ? 22050 : 44100;
   const wasPlaying = state.playing;
   if (wasPlaying) el.stop.click(); // rendering swaps out the live audio context
   el.wav.disabled = true;
@@ -529,8 +536,10 @@ el.wav.addEventListener('click', async () => {
     if (soloed) pat = pat.filterValues((v) => soundKey(v) === soloed);
     else if (muted.size) pat = pat.filterValues((v) => !muted.has(soundKey(v)));
     const cps = getRepl().scheduler.cps;
-    const { left, right, sampleRate, peak, scheduled, failures } = await renderOffline(pat, cps, cycles, {
-      onProgress: (f) => setStatus(`rendering ${cycles} cycles offline… ${Math.round(f * 100)}%`),
+    const { left, right, peak, scheduled, failures } = await renderOffline(pat, cps, cycles, {
+      sampleRate,
+      onProgress: (f) =>
+        setStatus(`rendering ${cycles} cycles${draft ? ' (draft 22kHz)' : ''}… ${Math.round(f * 100)}%`),
     });
     if (failures.size) {
       const lines = [...failures.entries()].map(([k, n]) => `${n}x ${k}`);
@@ -538,7 +547,7 @@ el.wav.addEventListener('click', async () => {
       showError(`render: some voices failed:\n${lines.join('\n')}`);
     }
     if (peak < 1e-4) throw new Error(`render came out silent (${scheduled} voices scheduled) — not downloading. See console.`);
-    download(encodeWav([left], [right], sampleRate), `${trackSlug()}_${stamp()}.wav`);
+    download(encodeWav([left], [right], sampleRate), `${trackSlug()}_${stamp()}${draft ? '_draft' : ''}.wav`);
     const secs = Math.round(cycles / cps);
     setStatus(
       `rendered ${cycles} cycles (${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}, peak ${peak.toFixed(2)}) → wav downloaded${wasPlaying ? ' — press ▶ to resume' : ''}`,
@@ -553,4 +562,4 @@ el.wav.addEventListener('click', async () => {
 });
 
 // expose for debugging / driving from devtools
-window.__player = { state, selectTrack, evalCode, saveTrack, getCode, setCode, getView, getRepl };
+window.__player = { state, selectTrack, evalCode, saveTrack, getCode, setCode, getView, getRepl, renderOffline };

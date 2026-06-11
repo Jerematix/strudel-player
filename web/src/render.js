@@ -1,23 +1,31 @@
-// Offline (faster-than-realtime) track renderer.
+// Offline (faster-than-realtime where the browser allows) track renderer.
 //
 // We do NOT use @strudel/webaudio's renderPatternAudio: it closes the live
 // audio context and builds the ENTIRE song's audio graph in one
 // OfflineAudioContext before rendering — on full tracks that is a memory bomb
-// (tab crash), and in our testing it intermittently mis-homes effect sends
-// across contexts, producing silent files.
+// (tab crash), and superdough's context-blind node pool silently kills voices
+// (see the nodePoolKey guard in strudel.js).
 //
-// Instead we render in chunks: each chunk gets a FRESH OfflineAudioContext
-// (+ tail so reverb/delay rings past the boundary), haps are scheduled with
-// superdough directly, and chunks are overlap-added into one master buffer.
-// Per-voice errors are collected instead of swallowed, and the caller gets
-// the final peak so a silent render can be rejected instead of downloaded.
+// Chunks render SEQUENTIALLY and SMALL, on purpose. Measured in Chrome (2026-06):
+//  - OfflineAudioContexts containing AudioWorkletNodes (superdough always
+//    has some) are serialized onto ONE offline rendering thread — concurrent
+//    renders give 1.00x speedup and triple per-chunk times via contention;
+//    audioWorklet.addModule() on a new context blocks behind in-flight
+//    renders, so pipelining gains nothing either. (No OfflineAudioContext in
+//    workers in this Chrome, so worker parallelism is out too.)
+//  - Render cost is SUPERLINEAR in chunk length (finished voices keep
+//    burdening the graph until their delayed release fires): the same dense
+//    16 cycles rendered in 38.3s as one chunk, 4.7s as 4-cycle chunks,
+//    1.9s as 2-cycle chunks. Small chunks ARE the speedup: ~8-14x realtime.
 //
-// Known seam caveat: per-orbit feedback (delay regen) restarts at chunk
-// boundaries. With the default 16-cycle chunks + 6s tails this is inaudible
-// in practice.
+// Chunks get a tail so reverb/delay rings past the boundary, and are
+// overlap-added into one master buffer. Seam caveats (every chunkCycles
+// bars): per-orbit delay feedback restarts, and a `cut` group can't choke a
+// voice from the previous chunk (its tail rings out via the overlap instead).
+// 4-cycle chunks align seams with musical phrases, which keeps this inaudible
+// in practice; bump chunkCycles if a track audibly smears at seams.
 
 import {
-  getAudioContext,
   setAudioContext,
   setSuperdoughAudioController,
   superdough,
@@ -25,16 +33,20 @@ import {
 } from '@strudel/webaudio';
 
 export async function renderOffline(pat, cps, cycles, opts = {}) {
-  const { chunkCycles = 16, tailSeconds = 6, sampleRate = 44100, onProgress } = opts;
+  const { chunkCycles = 4, tailSeconds = 6, sampleRate = 44100, onProgress } = opts;
   const totalFrames = Math.ceil((cycles / cps + tailSeconds) * sampleRate);
   const outL = new Float32Array(totalFrames);
   const outR = new Float32Array(totalFrames);
   const failures = new Map(); // "sound: error" -> count
   let scheduled = 0;
 
+  const totalChunks = Math.ceil(cycles / chunkCycles);
+  let doneChunks = 0;
+
   try {
     for (let c0 = 0; c0 < cycles; c0 += chunkCycles) {
       const c1 = Math.min(c0 + chunkCycles, cycles);
+      const tBuild = performance.now();
       const haps = pat
         .queryArc(c0, c1, { _cps: cps })
         .filter((h) => h.hasOnset())
@@ -58,8 +70,14 @@ export async function renderOffline(pat, cps, cycles, opts = {}) {
           failures.set(key, (failures.get(key) || 0) + 1);
         }
       }
+      const buildMs = Math.round(performance.now() - tBuild);
 
+      const tRender = performance.now();
       const buf = await ctx.startRendering();
+      console.log(
+        `[render] chunk ${c0}–${c1}: ${haps.length} haps, build ${buildMs}ms, render ${Math.round(performance.now() - tRender)}ms`,
+      );
+
       const off = Math.round((c0 / cps) * sampleRate);
       const L = buf.getChannelData(0);
       const R = buf.getChannelData(1);
@@ -67,7 +85,8 @@ export async function renderOffline(pat, cps, cycles, opts = {}) {
         outL[off + i] += L[i];
         outR[off + i] += R[i];
       }
-      onProgress?.(c1 / cycles);
+      doneChunks++;
+      onProgress?.(doneChunks / totalChunks);
     }
   } finally {
     // drop the offline globals — the next live use lazily creates a fresh
