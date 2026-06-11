@@ -11,7 +11,8 @@ let analyser = null;
 let raf = null;
 
 function ensureAnalyser() {
-  if (analyser) return analyser;
+  // recreate after an offline render replaced the audio context
+  if (analyser && analyser.context === getAudioContext()) return analyser;
   analyser = getAudioContext().createAnalyser();
   analyser.fftSize = 2048;
   analyser.smoothingTimeConstant = 0.82;

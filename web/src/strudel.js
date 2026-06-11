@@ -16,7 +16,7 @@ import { transpiler } from '@strudel/transpiler';
 import { miniAllStrings } from '@strudel/mini';
 import { slider, sliderWithID } from './sliders.js';
 
-export { samples, getAudioContext, initAudio } from '@strudel/webaudio';
+export { samples, getAudioContext, initAudio, renderPatternAudio } from '@strudel/webaudio';
 
 // --- master tap for the recorder -------------------------------------------
 // Patch AudioNode.connect so everything that reaches the context destination
@@ -27,7 +27,9 @@ let tap = null;
 const tapExcluded = new WeakSet();
 
 export function getTap() {
-  if (!tap) tap = getAudioContext().createGain();
+  // offline WAV rendering closes the live context and a fresh one is created
+  // lazily afterwards — the tap must follow, or recorder/viz go deaf
+  if (!tap || tap.context !== getAudioContext()) tap = getAudioContext().createGain();
   return tap;
 }
 
@@ -67,7 +69,13 @@ export function initStrudel(options = {}) {
   initAudioOnFirstClick();
   options.miniAllStrings !== false && miniAllStrings();
   const { prebake, ...replOptions } = options;
-  repl = webaudioRepl({ ...replOptions, transpiler });
+  repl = webaudioRepl({
+    ...replOptions,
+    transpiler,
+    // resolve the context per call — webaudioRepl's default captures the boot
+    // context, which offline rendering closes and replaces
+    getTime: () => getAudioContext().currentTime,
+  });
   initDone = (async () => {
     await defaultPrebake();
     await prebake?.();

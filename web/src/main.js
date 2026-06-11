@@ -1,4 +1,4 @@
-import { initStrudel, samples, evaluate, hush, getRepl, initAudio } from './strudel.js';
+import { initStrudel, samples, evaluate, hush, getRepl, initAudio, renderPatternAudio } from './strudel.js';
 import { isRecording, startRecording, stopRecording } from './recorder.js';
 import { bindSliderPanel, beginSliderEval, endSliderEval, clearSliders } from './sliders.js';
 import { initMidi } from './midi.js';
@@ -22,6 +22,7 @@ const el = {
   stop: document.getElementById('stop'),
   rec: document.getElementById('rec'),
   dl: document.getElementById('dl'),
+  wav: document.getElementById('wav'),
   status: document.getElementById('status'),
   tracklist: document.getElementById('tracklist'),
   trackname: document.getElementById('trackname'),
@@ -493,6 +494,51 @@ el.rec.addEventListener('click', () => {
 el.dl.addEventListener('click', () => {
   if (!state.track) return;
   download(new Blob([state.code], { type: 'text/plain' }), state.track.split('/').pop());
+});
+
+// --- offline WAV render -------------------------------------------------------
+// renderPatternAudio() renders into an OfflineAudioContext faster than
+// realtime and downloads the WAV itself. It CLOSES the live audio context;
+// getTap/getTime/analyser all re-resolve against the fresh one afterwards, so
+// pressing ▶ again just works.
+
+// default render length: sum the [cycles, section] weights of the arrange call
+function guessCycles(code) {
+  const i = code.indexOf('arrange(');
+  if (i < 0) return 16;
+  const total = [...code.slice(i).matchAll(/\[\s*(\d+)\s*,/g)].reduce((n, m) => n + +m[1], 0);
+  return total || 16;
+}
+
+el.wav.addEventListener('click', async () => {
+  if (!state.ready || !state.track) return;
+  const cycles = parseInt(prompt('render how many cycles (bars)?', guessCycles(state.code)), 10);
+  if (!cycles || cycles <= 0) return;
+  const wasPlaying = state.playing;
+  if (wasPlaying) el.stop.click(); // rendering replaces the live audio context
+  el.wav.disabled = true;
+  try {
+    setStatus(`rendering ${cycles} cycles offline…`);
+    beginSliderEval();
+    let pat = await evaluate(state.code, false);
+    endSliderEval();
+    if (!pat) throw new Error('eval failed — see the error panel');
+    // the render honors the chip mixer, like playback does
+    if (soloed) pat = pat.filterValues((v) => soundKey(v) === soloed);
+    else if (muted.size) pat = pat.filterValues((v) => !muted.has(soundKey(v)));
+    const cps = getRepl().scheduler.cps;
+    await renderPatternAudio(pat, cps, 0, cycles, 44100, undefined, false, `${trackSlug()}_${stamp()}`);
+    const secs = Math.round(cycles / cps);
+    setStatus(
+      `rendered ${cycles} cycles (${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}) → wav downloaded${wasPlaying ? ' — press ▶ to resume' : ''}`,
+    );
+  } catch (e) {
+    console.error(e);
+    showError(e);
+    setStatus('render failed');
+  } finally {
+    el.wav.disabled = false;
+  }
 });
 
 // expose for debugging / driving from devtools
