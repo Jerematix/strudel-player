@@ -16,7 +16,14 @@ import { transpiler } from '@strudel/transpiler';
 import { miniAllStrings } from '@strudel/mini';
 import { slider, sliderWithID } from './sliders.js';
 
-export { samples, getAudioContext, initAudio, renderPatternAudio } from '@strudel/webaudio';
+export {
+  samples,
+  getAudioContext,
+  setAudioContext,
+  setSuperdoughAudioController,
+  superdough,
+  initAudio,
+} from '@strudel/webaudio';
 
 // --- master tap for the recorder -------------------------------------------
 // Patch AudioNode.connect so everything that reaches the context destination
@@ -36,6 +43,23 @@ export function getTap() {
 export function excludeFromTap(node) {
   tapExcluded.add(node);
 }
+
+// --- node-pool poisoning guard ----------------------------------------------
+// superdough pools filter/compressor nodes in a module-global pool keyed by a
+// 'nodePoolKey' Symbol — but NOT by AudioContext. With offline rendering the
+// pool recycles nodes across contexts (live→offline, chunk→chunk, offline→
+// live), and every voice that receives a foreign-context node dies with
+// "cannot connect to an AudioNode belonging to a different audio context".
+// releaseNodeToPool() calls node.disconnect() BEFORE reading the pool key, so
+// stripping the key here keeps every node out of the pool. Costs the pooling
+// micro-optimization, buys correct renders.
+const origDisconnect = AudioNode.prototype.disconnect;
+AudioNode.prototype.disconnect = function (...args) {
+  for (const sym of Object.getOwnPropertySymbols(this)) {
+    if (sym.description === 'nodePoolKey') delete this[sym];
+  }
+  return origDisconnect.apply(this, args);
+};
 
 const origConnect = AudioNode.prototype.connect;
 AudioNode.prototype.connect = function (dest, ...args) {

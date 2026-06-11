@@ -1,5 +1,6 @@
-import { initStrudel, samples, evaluate, hush, getRepl, initAudio, renderPatternAudio } from './strudel.js';
-import { isRecording, startRecording, stopRecording } from './recorder.js';
+import { initStrudel, samples, evaluate, hush, getRepl, initAudio } from './strudel.js';
+import { isRecording, startRecording, stopRecording, encodeWav } from './recorder.js';
+import { renderOffline } from './render.js';
 import { bindSliderPanel, beginSliderEval, endSliderEval, clearSliders } from './sliders.js';
 import { initMidi } from './midi.js';
 import { initViz } from './viz.js';
@@ -497,10 +498,11 @@ el.dl.addEventListener('click', () => {
 });
 
 // --- offline WAV render -------------------------------------------------------
-// renderPatternAudio() renders into an OfflineAudioContext faster than
-// realtime and downloads the WAV itself. It CLOSES the live audio context;
-// getTap/getTime/analyser all re-resolve against the fresh one afterwards, so
-// pressing ▶ again just works.
+// renderOffline() (render.js) renders chunk by chunk into fresh
+// OfflineAudioContexts — faster than realtime, bounded memory, per-voice
+// error reporting, and a silence guard so a broken render never downloads.
+// It swaps the global audio context; getTap/getTime/analyser all re-resolve
+// per use, so pressing ▶ afterwards just works.
 
 // default render length: sum the [cycles, section] weights of the arrange call
 function guessCycles(code) {
@@ -515,7 +517,7 @@ el.wav.addEventListener('click', async () => {
   const cycles = parseInt(prompt('render how many cycles (bars)?', guessCycles(state.code)), 10);
   if (!cycles || cycles <= 0) return;
   const wasPlaying = state.playing;
-  if (wasPlaying) el.stop.click(); // rendering replaces the live audio context
+  if (wasPlaying) el.stop.click(); // rendering swaps out the live audio context
   el.wav.disabled = true;
   try {
     setStatus(`rendering ${cycles} cycles offline…`);
@@ -527,10 +529,19 @@ el.wav.addEventListener('click', async () => {
     if (soloed) pat = pat.filterValues((v) => soundKey(v) === soloed);
     else if (muted.size) pat = pat.filterValues((v) => !muted.has(soundKey(v)));
     const cps = getRepl().scheduler.cps;
-    await renderPatternAudio(pat, cps, 0, cycles, 44100, undefined, false, `${trackSlug()}_${stamp()}`);
+    const { left, right, sampleRate, peak, scheduled, failures } = await renderOffline(pat, cps, cycles, {
+      onProgress: (f) => setStatus(`rendering ${cycles} cycles offline… ${Math.round(f * 100)}%`),
+    });
+    if (failures.size) {
+      const lines = [...failures.entries()].map(([k, n]) => `${n}x ${k}`);
+      console.warn('[render] voice failures:', lines);
+      showError(`render: some voices failed:\n${lines.join('\n')}`);
+    }
+    if (peak < 1e-4) throw new Error(`render came out silent (${scheduled} voices scheduled) — not downloading. See console.`);
+    download(encodeWav([left], [right], sampleRate), `${trackSlug()}_${stamp()}.wav`);
     const secs = Math.round(cycles / cps);
     setStatus(
-      `rendered ${cycles} cycles (${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}) → wav downloaded${wasPlaying ? ' — press ▶ to resume' : ''}`,
+      `rendered ${cycles} cycles (${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}, peak ${peak.toFixed(2)}) → wav downloaded${wasPlaying ? ' — press ▶ to resume' : ''}`,
     );
   } catch (e) {
     console.error(e);

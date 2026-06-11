@@ -43,7 +43,7 @@ export function stopRecording() {
   return blob;
 }
 
-function encodeWav(chunksL, chunksR, sampleRate) {
+export function encodeWav(chunksL, chunksR, sampleRate) {
   const len = chunksL.reduce((n, c) => n + c.length, 0);
   const buffer = new ArrayBuffer(44 + len * 4);
   const view = new DataView(buffer);
