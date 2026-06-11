@@ -1,0 +1,13 @@
+# deps / build
+node_modules/
+web/dist/
+
+# OS noise
+.DS_Store
+
+# no audio files in a public repo — load samples from the network instead
+*.wav
+*.mp3
+*.aiff
+*.flac
+*.ogg

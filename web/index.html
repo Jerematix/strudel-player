@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>strudel player</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>strudel<span class="accent">.player</span></h1>
+      <div class="controls">
+        <button id="play" disabled>▶ play</button>
+        <button id="stop" disabled>■ stop</button>
+        <button id="rec" title="record the master output, save as WAV">● rec</button>
+        <button id="dl" title="download the .strudel file">⬇ code</button>
+        <button id="vizbtn" title="oscilloscope + spectrum of the master output">∿ viz</button>
+      </div>
+      <div id="sounds" class="sounds"></div>
+      <div id="status" class="status">booting engine…</div>
+    </header>
+    <main>
+      <aside id="tracklist" class="tracklist"></aside>
+      <section class="codewrap">
+        <div class="trackbar">
+          <div id="trackname" class="trackname"></div>
+          <div class="trackactions">
+            <button id="tnew" title="new track">＋ new</button>
+            <button id="tdup" title="duplicate this track">⧉ dup</button>
+            <button id="tren" title="rename / move this track">↹ ren</button>
+            <button id="tdel" title="delete this track">✕ del</button>
+          </div>
+        </div>
+        <div id="sliders" class="sliders" hidden></div>
+        <div id="editor" class="editorhost"></div>
+        <div id="error" class="error" hidden></div>
+      </section>
+    </main>
+    <canvas id="viz" class="viz" hidden></canvas>
+    <footer>
+      <span>type here or edit <code>tracks/*.strudel</code> in any editor — everything saves to disk and swaps in at the next cycle boundary (Ctrl+Enter applies now)</span>
+    </footer>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

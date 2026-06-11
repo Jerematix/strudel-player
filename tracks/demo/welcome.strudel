@@ -1,0 +1,22 @@
+// welcome to strudel player
+//
+// 1. press ▶ play
+// 2. edit this file — right here in the browser, or in any editor on disk
+// 3. changes apply at the next cycle boundary (Ctrl+Enter applies now)
+//
+// try it: change "bd*4" to "bd*2 [~ bd]", or drag the slider above the code.
+// click a chip in the header to mute that voice, alt-click to solo.
+
+setcps(120/60/4) // 120 BPM, 1 cycle = 1 bar
+
+// each slider() call renders a widget above the code — drag it live,
+// or click its label (s1) and twist a knob on a MIDI controller to bind it
+const cutoff = slider(1200, 200, 4000)
+
+$: stack(
+  s("bd*4").bank("RolandTR909"),                 // drums need .bank(...)
+  s("~ cp ~ cp").bank("RolandTR909"),
+  s("hh*8").bank("RolandTR909").gain("[0.4 0.7]*4"),
+  note("<c2 c2 eb2 g1>*8").s("sawtooth")
+    .lpf(cutoff).decay(0.2).sustain(0).gain(0.6)
+)

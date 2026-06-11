@@ -1,0 +1,13 @@
+{
+  "samplePacks": [
+    "https://raw.githubusercontent.com/felixroos/dough-samples/main/tidal-drum-machines.json",
+    "https://raw.githubusercontent.com/felixroos/dough-samples/main/piano.json",
+    "https://raw.githubusercontent.com/felixroos/dough-samples/main/vcsl.json",
+    "https://raw.githubusercontent.com/felixroos/dough-samples/main/mridangam.json",
+    "https://raw.githubusercontent.com/felixroos/dough-samples/main/EmuSP12.json",
+    "https://raw.githubusercontent.com/felixroos/dough-samples/main/Dirt-Samples.json",
+    "github:tidalcycles/Dirt-Samples",
+    "github:eddyflux/crate",
+    "github:Bubobubobubobubo/Dough-Amen"
+  ]
+}

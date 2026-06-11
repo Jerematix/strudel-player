@@ -1,0 +1,226 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --border: #21262d;
+  --fg: #e6edf3;
+  --dim: #8b949e;
+  --accent: #ff5fa2;
+  --accent2: #58e6d9;
+  --error: #ff7b72;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.8rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+h1 { font-size: 1.1rem; font-weight: 600; }
+.accent { color: var(--accent); }
+
+.controls { display: flex; gap: 0.5rem; }
+
+button {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 1rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: 0.4; cursor: default; }
+button.playing { border-color: var(--accent2); color: var(--accent2); }
+
+.status { color: var(--dim); font-size: 0.8rem; }
+
+/* live "now sounding" chips */
+.sounds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-left: auto;
+  max-width: 40%;
+  justify-content: flex-end;
+}
+.chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.7rem;
+  color: var(--dim);
+  opacity: 0.45;
+  transition: all 120ms ease;
+}
+.chip.on {
+  border-color: var(--accent2);
+  color: var(--accent2);
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(88, 230, 217, 0.35);
+}
+.chip { cursor: pointer; user-select: none; }
+.chip.muted {
+  text-decoration: line-through;
+  border-color: var(--error);
+  color: var(--error);
+  opacity: 0.6;
+  box-shadow: none;
+}
+.chip.solo {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 8px rgba(255, 95, 162, 0.45);
+}
+
+
+main { display: flex; flex: 1; min-height: 0; }
+
+.tracklist {
+  width: 220px;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  padding: 0.6rem;
+  overflow-y: auto;
+}
+
+.tracklist button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 0.15rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--dim);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+.tracklist button:hover { color: var(--fg); border-color: var(--border); }
+.tracklist button.folder {
+  color: var(--fg);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: lowercase;
+}
+.tracklist button.file.active {
+  color: var(--accent2);
+  border-color: var(--accent2);
+  background: rgba(88, 230, 217, 0.06);
+}
+
+#rec.recording {
+  border-color: var(--error);
+  color: var(--error);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% { box-shadow: 0 0 10px rgba(255, 123, 114, 0.6); }
+}
+
+.codewrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+.trackbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-right: 0.8rem;
+}
+.trackname {
+  padding: 0.5rem 1.2rem;
+  color: var(--dim);
+  font-size: 0.8rem;
+}
+.trackactions { display: flex; gap: 0.3rem; }
+.trackactions button {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  color: var(--dim);
+}
+
+/* live slider() widgets */
+.sliders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+  padding: 0.5rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.slider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+.slider .slabel { color: var(--dim); cursor: pointer; }
+.slider .slabel:hover { color: var(--accent); }
+.slider.learning {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.slider .sval { color: var(--accent2); min-width: 4.5ch; }
+.slider input[type='range'] {
+  width: 160px;
+  accent-color: var(--accent);
+  background: transparent;
+}
+
+/* CodeMirror host — the strudel theme paints inside, we set the frame */
+.editorhost {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.editorhost .cm-editor {
+  height: 100%;
+  font-size: 0.85rem;
+  background: var(--bg);
+}
+.editorhost .cm-scroller {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  line-height: 1.5;
+}
+.editorhost .cm-gutters { background: var(--bg); border-right: 1px solid var(--border); }
+
+.error {
+  border-top: 1px solid var(--error);
+  background: rgba(255, 123, 114, 0.08);
+  color: var(--error);
+  padding: 0.6rem 1.2rem;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+
+.viz {
+  height: 72px;
+  width: 100%;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+footer {
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--dim);
+  font-size: 0.75rem;
+  padding: 0.5rem 1.2rem;
+}
+footer code { color: var(--accent2); }

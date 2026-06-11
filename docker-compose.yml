@@ -1,0 +1,16 @@
+services:
+  player:
+    image: node:22-alpine
+    container_name: strudel-player
+    working_dir: /app/web
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "5273:5273"
+    volumes:
+      - ./:/app
+      # keep linux node_modules out of the macOS mount
+      - node_modules:/app/web/node_modules
+    restart: unless-stopped
+
+volumes:
+  node_modules:

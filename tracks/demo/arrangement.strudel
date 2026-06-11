@@ -1,0 +1,53 @@
+// arrangement demo — the track-file convention this player is built around:
+//   setcps  →  const voices  →  const sections (stack()s)  →  $: arrange(...)
+// Self-contained: everything the song needs lives in this one file.
+//
+// Inside arrange(), every section runs on its own local clock starting at
+// cycle 0 — so a ramp like saw.range(a, b).slow(N) sized to the section's
+// cycle count traverses exactly once, starting when the section starts.
+
+setcps(124/60/4) // 124 BPM, 1 cycle = 1 bar
+
+// --- live macros -------------------------------------------------------------
+const energy = slider(2000, 300, 5000) // master bass filter — THE build knob
+const space  = slider(0.3, 0, 1)       // reverb send on the keys
+
+// --- voices ------------------------------------------------------------------
+const kick   = s("bd*4").bank("RolandTR909")
+const clap   = s("~ cp").bank("RolandTR909").fast(2).gain(0.8)
+const hats   = s("hh*8").bank("RolandTR909").gain("[0.35 0.6]*4")
+const ride   = s("~ rd").bank("RolandTR909").fast(2).gain(0.3).pan(0.6)
+
+const bass = note("<a1 a1 f1 g1>*8")
+  .s("sawtooth").decay(0.25).sustain(0)
+  .gain(0.55).lpf(energy)
+
+// chord stacks inside <> break the mini-notation parser —
+// stack single-note lines instead:
+const keys = stack(
+  note("<a3 a3 f3 g3>"),
+  note("<c4 c4 c4 b3>"),
+  note("<e4 e4 a3 d4>")
+).s("gm_epiano1").struct("~ x ~ [~ x]")
+  .release(0.5).gain(0.5).room(space)
+
+const arp = n("0 2 4 7 4 2 7 4").scale("a3:minor")
+  .s("triangle").decay(0.15).sustain(0)
+  .lpf(saw.range(800, 2600).slow(8)) // sized to the 8-bar section → ramps once
+  .gain(saw.range(0.05, 0.3).slow(8))
+
+// --- sections ----------------------------------------------------------------
+const intro    = stack(hats.gain(0.25), keys.gain(0.35))
+const grooveIn = stack(kick, hats, bass)
+const full     = stack(kick, clap, hats, ride, bass, keys)
+const lift     = stack(kick, clap, hats, ride, bass, keys, arp)
+const outro    = stack(hats.gain(0.3), bass.lpf(500).gain(0.4), keys.gain(0.3))
+
+// --- arrangement (32 bars ≈ 1:02 at 124) --------------------------------------
+$: arrange(
+  [4, intro],
+  [8, grooveIn],
+  [8, full],
+  [8, lift],
+  [4, outro]
+)
